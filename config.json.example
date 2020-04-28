@@ -1,0 +1,14 @@
+{
+  "okta": {
+    "issuer": "[okta issuer from authorization server]",
+    "clientId": "[client id]"
+  },
+  "idp": {
+    "metadata": "./data/idpdefault.xml",
+    "privateKey": "./data/encryptKey.pem"
+  },
+  "sp": {
+    "metadata": "./data/sp-metadata.xml"
+  }
+  
+}
