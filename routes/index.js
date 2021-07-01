@@ -1,18 +1,26 @@
 var express = require('express');
 var router = express.Router();
+var path = require('path');
+var config = require('../config.json');
+
+var redisPort = process.env.redisPort || config.redis.port;
+var redisHost = process.env.redisHost || config.redis.host;
+var redisPassword = process.env.redisPassword || config.redis.password;
+
 var client = require('redis').createClient();
-var saml = require('../saml');
+//var client = require('redis').createClient(redisPort, redisHost,
+//    {auth_pass: redisPassword, tls: {servername: redisHost}});
+
+var saml = require('../saml.js');
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
   res.render('index', { title: 'Express' });
 });
 
-
-
 router.get('/verifyandredirect/:samlid', function (req, res) {
+
   var samlid = req.params.samlid;
-  console.log(samlid);
   client.get(samlid, function (err, valstr) {
     var val = JSON.parse(valstr);
     var html = `

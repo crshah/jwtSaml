@@ -1,6 +1,23 @@
 const saml = require('samlify');
 var fs = require('fs');
-var config = require('./config');
+var path = require('path');
+var config = require('./config.json');
+
+var idpMetadata = process.env.idpMetadata;
+if (!idpMetadata) {
+  var idpMetadataPath = process.env.idpMetadataPath || config.idp.metadata;
+  idpMetadata=  fs.readFileSync(path.normalize(idpMetadataPath));
+} 
+var privateKey = process.env.privateKey;
+if (!privateKey) {
+  var privateKeyPath = process.env.privateKeyPath || config.idp.privateKey;
+  privateKey = fs.readFileSync(path.normalize(privateKeyPath));
+}
+var spMetadata = process.env.spMetadata;
+if (!spMetadata) {
+  var spMetadataPath = process.env.spMetadataPath || config.sp.metadata;
+  spMetadata = fs.readFileSync(path.normalize(spMetadataPath));
+}
 
 // Custom template
 const loginResponseTemplate = {
@@ -36,15 +53,14 @@ const loginResponseTemplate = {
 };
 
 const idp = new saml.IdentityProvider({
-  // required
-  metadata: fs.readFileSync(config.idp.metadata),
-  privateKey: fs.readFileSync(config.idp.privateKey),
+  metadata: idpMetadata,
+  privateKey: privateKey.toString().replace(/\\n/gm, '\n'),
   loginResponseTemplate: loginResponseTemplate,
   isAssertionEncrypted: false
 });
 
 const sp = new saml.ServiceProvider({
-  metadata: fs.readFileSync(config.sp.metadata),
+  metadata: spMetadata,
   transformationAlgorithms: [
       'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
       'http://www.w3.org/2001/10/xml-exc-c14n#',
@@ -58,13 +74,11 @@ const createTemplateCallback = (_idp, _sp, user) => template => {
   const _id =  _idp.entitySetting.generateID();
   const now = new Date();
   const spEntityID = _sp.entityMeta.getEntityID();
-  console.log(spEntityID);
   const idpSetting = _idp.entitySetting;
   const fiveMinutesLater = new Date(now.getTime());
   fiveMinutesLater.setMinutes(fiveMinutesLater.getMinutes() + 5);
-  //console.log(JSON.stringify(_sp.entityMeta));
   const acl = _sp.entityMeta.getAssertionConsumerService('post');
-  console.log(acl);
+
   const tvalue = {
     ID: _id,
     AssertionID: idpSetting.generateID ? idpSetting.generateID() : `${uuid.v4()}`,
@@ -80,10 +94,8 @@ const createTemplateCallback = (_idp, _sp, user) => template => {
     SubjectConfirmationDataNotOnOrAfter: fiveMinutesLater.toISOString(),
     AssertionConsumerServiceURL: _sp.entityMeta.getAssertionConsumerService('post'),
     EntityID: spEntityID,
-   // InResponseTo: '_4606cc1f427fa981e6ffd653ee8d6972fc5ce398c4',
     StatusCode: 'urn:oasis:names:tc:SAML:2.0:status:Success',
     attrUserEmail: user.email,
-    //attrUserName: 'mynameinsp',
   };
   return {
     id: _id,

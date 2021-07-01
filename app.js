@@ -1,16 +1,35 @@
 var createError = require('http-errors');
 var express = require('express');
+var cors = require('cors');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-var config = require('./config');
+var config = require('./config.json');
+
+
+var oktaJWTConfig;
+if (process.env.oktaJWTConfig) {
+  // Change ' to "" for CI / CD scripts that can't pass " in an env var for the oktaJWTConfig
+  var config = process.env.oktaJWTConfig.replace(/'/g, "\"");
+  oktaJWTConfig = JSON.parse(config);
+} else {
+  oktaJWTConfig = config.okta;
+}
+console.log("oktaJWTConfig = " + oktaJWTConfig);
+console.log("oktaJWTConfig = ") + JSON.stringify(oktaJWTConfig);
+console.log("Found " + oktaJWTConfig.length + " verifiers");
 
 const OktaJwtVerifier = require('@okta/jwt-verifier');
- 
-const oktaJwtVerifier = new OktaJwtVerifier({
-  issuer: config.okta.issuer, // required
-  clientId: config.okta.clientId
-});
+const verifiers = [];
+
+for (x=0; x<oktaJWTConfig.length; x++) {
+  console.log("Adding verifier. Issuer = " + oktaJWTConfig[x].issuer + ", ClientId = " + oktaJWTConfig[x].clientId);
+  const oktaJwtVerifier = new OktaJwtVerifier({
+    issuer: oktaJWTConfig[x].issuer, // required
+    clientId: oktaJWTConfig[x].clientId
+  });
+  verifiers.push([oktaJwtVerifier, oktaJWTConfig[x].audience]);
+}
 
 var indexRouter = require('./routes/index');
 var verifyRouter = require('./routes/verify');
@@ -20,7 +39,9 @@ var app = express();
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
+app.set('env', 'development');
 
+app.use(cors());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -48,27 +69,43 @@ app.use(function(err, req, res, next) {
 });
 
 function verifyToken(req, res, next) {
+
   const bearerHeader = req.headers['authorization'];
-  console.log(bearerHeader);
-  
+
   if (bearerHeader) {
     const bearer = bearerHeader.split(' ');
     const bearerToken = bearer[1];
-    oktaJwtVerifier.verifyAccessToken(bearerToken, 'api://default')
-    .then(jwt => {
-      req.sub = jwt.claims.sub;
-      next();
-    })
-    .catch(err => {
-      console.log(err);
-      res.sendStatus(403);
-    });
-    
-    
+
+    doTokenVerification(0, bearerToken, req, res, next);
+
   } else {
-    // Forbidden
+    // No bearer header provided
+    // Return a 403 Forbidden error
     res.sendStatus(403);
   }
+}
+
+function doTokenVerification(x, bearerToken, req, res, next) {
+
+  verifiers[x][0].verifyAccessToken(bearerToken, verifiers[x][1])
+      .then(jwt => {
+        req.sub = jwt.claims.sub;
+        console.log("sub = " + req.sub);
+        console.log("JWT verified");
+        next();
+      })
+      .catch(err => {
+        console.log("JWT failed verification for this verifier");
+        console.log(err);
+        if (x === verifiers.length-1) {
+          console.log("JWT failed verification");
+          // return a 403 Forbidden error
+          res.sendStatus(403);
+        } else {
+          x = x + 1;
+          doTokenVerification(x, bearerToken, req, res, next);
+        }
+      });
 }
 
 module.exports = app;
