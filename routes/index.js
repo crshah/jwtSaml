@@ -23,6 +23,11 @@ router.get('/verifyandredirect/:samlid', function (req, res) {
   var samlid = req.params.samlid;
   client.get(samlid, function (err, valstr) {
     var val = JSON.parse(valstr);
+    //TODO - Add config option to redirect to custom error template.
+    if(!val) {
+        val = {samlResponse: "",
+                relayState: ""}
+    }
     var html = `
           <html>
             <body Onload="document.forms[0].submit()">

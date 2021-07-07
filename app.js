@@ -5,6 +5,8 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var config = require('./config.json');
+var UserInfoVerifier = require('./userInfo');
+
 
 
 var oktaJWTConfig;
@@ -23,12 +25,18 @@ const OktaJwtVerifier = require('@okta/jwt-verifier');
 const verifiers = [];
 
 for (x=0; x<oktaJWTConfig.length; x++) {
-  console.log("Adding verifier. Issuer = " + oktaJWTConfig[x].issuer + ", ClientId = " + oktaJWTConfig[x].clientId);
-  const oktaJwtVerifier = new OktaJwtVerifier({
-    issuer: oktaJWTConfig[x].issuer, // required
-    clientId: oktaJWTConfig[x].clientId
-  });
-  verifiers.push([oktaJwtVerifier, oktaJWTConfig[x].audience]);
+    console.log("Adding verifier. Issuer = " + oktaJWTConfig[x].issuer + ", ClientId = " + oktaJWTConfig[x].clientId);
+    if(oktaJWTConfig[x].introspectLocal) {
+        const oktaJwtVerifier = new OktaJwtVerifier({
+            issuer: oktaJWTConfig[x].issuer, // required
+            clientId: oktaJWTConfig[x].clientId
+        });
+        verifiers.push([oktaJwtVerifier, oktaJWTConfig[x].audience]);
+    } else {
+        const userInfoVerifier = new UserInfoVerifier(oktaJWTConfig[x].userInfo);
+        verifiers.push([userInfoVerifier, oktaJWTConfig[x].audience]);
+    }
+  
 }
 
 var indexRouter = require('./routes/index');
@@ -87,25 +95,25 @@ function verifyToken(req, res, next) {
 
 function doTokenVerification(x, bearerToken, req, res, next) {
 
-  verifiers[x][0].verifyAccessToken(bearerToken, verifiers[x][1])
-      .then(jwt => {
-        req.sub = jwt.claims.sub;
-        console.log("sub = " + req.sub);
-        console.log("JWT verified");
-        next();
-      })
-      .catch(err => {
-        console.log("JWT failed verification for this verifier");
-        console.log(err);
-        if (x === verifiers.length-1) {
-          console.log("JWT failed verification");
-          // return a 403 Forbidden error
-          res.sendStatus(403);
-        } else {
-          x = x + 1;
-          doTokenVerification(x, bearerToken, req, res, next);
-        }
-      });
+    verifiers[x][0].verifyAccessToken(bearerToken, verifiers[x][1])
+        .then(jwt => {
+            req.sub = jwt.claims.sub;
+            console.log("sub = " + req.sub);
+            console.log("JWT verified");
+            next();
+        })
+        .catch(err => {
+            console.log("JWT failed verification for this verifier");
+            console.log(err);
+            if (x === verifiers.length-1) {
+            console.log("JWT failed verification");
+            // return a 403 Forbidden error
+            res.sendStatus(403);
+            } else {
+            x = x + 1;
+            doTokenVerification(x, bearerToken, req, res, next);
+            }
+        });
 }
 
 module.exports = app;
