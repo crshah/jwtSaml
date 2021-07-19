@@ -8,7 +8,7 @@ var redisHost = process.env.redisHost || config.redis.host;
 var redisPassword = process.env.redisPassword || config.redis.password;
 var ttl = process.env.redisTTL || config.redis.ttl;
 
-var client = require('redis').createClient();
+var client = require('redis').createClient(config.redis);
 
 //var client = require('redis').createClient(redisPort, redisHost,
 //    {auth_pass: redisPassword, tls: {servername: redisHost}});
