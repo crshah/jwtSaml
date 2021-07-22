@@ -1,14 +1,24 @@
 {
-  "okta": {
-    "issuer": "[okta issuer from authorization server]",
-    "clientId": "[client id]"
-  },
-  "idp": {
-    "metadata": "./data/idpdefault.xml",
-    "privateKey": "./data/encryptKey.pem"
-  },
-  "sp": {
-    "metadata": "./data/sp-metadata.xml"
-  }
-  
+    "okta": [{
+        "issuer": "[issuer of access token]",
+        "clientId": "[clientId of client app]",
+        "audience": "[audience defined by authorization server]",
+        "introspectLocal": [true, false],  
+        "userInfo": "[oauth userinfo endpoint url, required if introspectLocal is false]"
+    }],
+    "idp": {
+        "metadata": "./data/idpdefault.xml",
+        "privateKey": "./data/encryptKey.pem"
+    },
+    "sp": {
+        "metadata": "./data/sp-metadata.xml"
+    },
+    "server" : {
+        "port": "[server port]"
+    },
+    "redis": {
+        "host": "[host of redis redis server]"
+        “port”: “[port of redis server]”,
+        
+    }
 }
